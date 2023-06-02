@@ -1,3 +1,5 @@
+use crate::token::{self, Token};
+
 pub struct Lexer {
     input: String,
     position: usize,      // current position in input (points to current char)
@@ -143,8 +145,6 @@ fn is_letter(ch: char) -> bool {
 fn is_digit(ch: char) -> bool {
     '0' <= ch && ch <= '9'
 }
-
-use crate::token::{self, Token};
 
 #[cfg(test)]
 mod tests {
