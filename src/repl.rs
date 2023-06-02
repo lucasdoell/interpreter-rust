@@ -6,6 +6,8 @@ pub fn start<T: BufRead, U: Write>(input: T, mut output: U) {
     let mut buf = String::new();
 
     loop {
+        print!("{}", ">> ");
+        io::stdout().flush().unwrap();
         let scanned = scanner.read_line(&mut buf).unwrap();
         if scanned == 0 {
             return;
