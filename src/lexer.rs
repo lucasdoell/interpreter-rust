@@ -91,7 +91,6 @@ impl Lexer {
                     return tok;
                 } else {
                     tok = self.new_token(token::ILLEGAL.to_string(), self.ch);
-                    return tok;
                 }
             }
         }
@@ -169,6 +168,7 @@ return false;
 }
 10 == 10;
 10 != 9;
+:
 "#;
 
         let tests = [
@@ -245,6 +245,7 @@ return false;
             (token::NOT_EQ.to_string(), "!="),
             (token::INT.to_string(), "9"),
             (token::SEMICOLON.to_string(), ";"),
+            (token::ILLEGAL.to_string(), ":"),
             (token::EOF.to_string(), ""),
         ];
 
