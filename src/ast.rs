@@ -5,7 +5,7 @@ pub trait Node {
     fn string(&self) -> String;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Statement {
     LetStatement(LetStatement),
     ReturnStatement(ReturnStatement),
@@ -19,6 +19,9 @@ pub enum Expression {
     IntegerLiteral(IntegerLiteral),
     PrefixExpression(PrefixExpression),
     InfixExpression(InfixExpression),
+    Boolean(Boolean),
+    IfExpression(IfExpression),
+    BlockStatement(BlockStatement),
     // Other types of expressions...
 }
 
@@ -29,6 +32,8 @@ impl Node for Expression {
             Expression::IntegerLiteral(lit) => lit.token_literal(),
             Expression::PrefixExpression(expr) => expr.token_literal(),
             Expression::InfixExpression(expr) => expr.token_literal(),
+            Expression::Boolean(boolean) => boolean.token_literal(),
+            Expression::IfExpression(expr) => expr.token_literal(),
             // Handle other cases as needed
             _ => unimplemented!(),
         }
@@ -40,6 +45,8 @@ impl Node for Expression {
             Expression::IntegerLiteral(lit) => lit.string(),
             Expression::PrefixExpression(expr) => expr.string(),
             Expression::InfixExpression(expr) => expr.string(),
+            Expression::Boolean(boolean) => boolean.string(),
+            Expression::IfExpression(expr) => expr.string(),
             // Handle other cases as needed
             _ => unimplemented!(),
         }
@@ -92,7 +99,7 @@ impl Node for Program {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LetStatement {
     pub token: token::Token, // the token::LET token
     pub name: Identifier,
@@ -138,7 +145,7 @@ impl Node for Identifier {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ReturnStatement {
     pub token: token::Token, // the token::RETURN token
     pub return_value: Expression,
@@ -165,7 +172,7 @@ impl Node for ReturnStatement {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExpressionStatement {
     pub token: token::Token, // the first token of the expression
     pub expression: Option<Expression>,
@@ -248,6 +255,74 @@ impl Node for InfixExpression {
         out.push(' ');
         out.push_str(&self.right.string());
         out.push(')');
+
+        out
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Boolean {
+    pub token: token::Token,
+    pub value: bool,
+}
+
+impl Node for Boolean {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn string(&self) -> String {
+        self.token.literal.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IfExpression {
+    pub token: token::Token, // The 'if' token
+    pub condition: Box<Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+impl Node for IfExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn string(&self) -> String {
+        let mut out = String::new();
+
+        out.push_str("if");
+        out.push_str(&self.condition.string());
+        out.push_str(" ");
+        out.push_str(&self.consequence.string());
+
+        if let Some(alt) = &self.alternative {
+            out.push_str("else ");
+            out.push_str(&alt.string());
+        }
+
+        out
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BlockStatement {
+    pub token: token::Token, // The { token
+    pub statements: Vec<Statement>,
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn string(&self) -> String {
+        let mut out = String::new();
+
+        for stmt in &self.statements {
+            out.push_str(&stmt.string());
+        }
 
         out
     }
