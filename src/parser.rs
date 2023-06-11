@@ -37,6 +37,7 @@ pub fn get_precedences() -> HashMap<String, i32> {
     precedences.insert(token::MINUS.into(), Precedence::Sum as i32);
     precedences.insert(token::SLASH.into(), Precedence::Product as i32);
     precedences.insert(token::ASTERISK.into(), Precedence::Product as i32);
+    precedences.insert(token::LPAREN.into(), Precedence::Call as i32);
 
     precedences
 }
@@ -76,6 +77,7 @@ impl Parser {
         p.register_infix(token::NOT_EQ.to_string(), Parser::parse_infix_expression);
         p.register_infix(token::LT.to_string(), Parser::parse_infix_expression);
         p.register_infix(token::GT.to_string(), Parser::parse_infix_expression);
+        p.register_infix(token::LPAREN.to_string(), Parser::parse_call_expression);
 
         p.next_token();
         p.next_token();
@@ -459,6 +461,40 @@ impl Parser {
 
         Some(identifiers)
     }
+
+    fn parse_call_expression(p: &mut Parser, function: ast::Expression) -> Option<ast::Expression> {
+        let exp = ast::CallExpression {
+            token: p.cur_token.clone(),
+            function: Box::new(function),
+            arguments: Parser::parse_call_arguments(p).unwrap(),
+        };
+
+        Some(ast::Expression::CallExpression(exp))
+    }
+
+    fn parse_call_arguments(p: &mut Parser) -> Option<Vec<ast::Expression>> {
+        let mut args: Vec<ast::Expression> = vec![];
+
+        if p.peek_token_is(token::RPAREN) {
+            p.next_token();
+            return Some(args);
+        }
+
+        p.next_token();
+        args.push(Parser::parse_expression(p, Precedence::Lowest as i32).unwrap());
+
+        while p.peek_token_is(token::COMMA) {
+            p.next_token();
+            p.next_token();
+            args.push(Parser::parse_expression(p, Precedence::Lowest as i32).unwrap());
+        }
+
+        if !p.expect_peek(token::RPAREN.to_string()) {
+            return None;
+        }
+
+        Some(args)
+    }
 }
 
 #[cfg(test)]
@@ -813,6 +849,15 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         for tt in tests {
@@ -1232,6 +1277,71 @@ mod tests {
                     stmt.string()
                 ),
             }
+        }
+    }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let l = lexer::Lexer::new(input.to_string());
+        let mut p = Parser::new(l);
+        let program = Parser::parse_program(&mut p);
+        check_parser_errors(&p);
+
+        if program.as_ref().unwrap().statements.len() != 1 {
+            panic!(
+                "program.statements does not contain 1 statements. got={}",
+                program.unwrap().statements.len()
+            );
+        }
+
+        let stmt = program.unwrap().statements[0].clone();
+
+        match stmt {
+            Statement::ExpressionStatement(expr_stmt) => {
+                let exp = match expr_stmt.expression {
+                    Some(Expression::CallExpression(exp)) => exp,
+                    _ => panic!(
+                        "exp not CallExpression. got={:?}",
+                        expr_stmt.expression.unwrap().string()
+                    ),
+                };
+
+                if !test_identifier(Some(exp.function), "add".to_string()) {
+                    return;
+                }
+
+                if exp.arguments.len() != 3 {
+                    panic!(
+                        "wrong length of arguments. want 3, got={}",
+                        exp.arguments.len()
+                    );
+                }
+
+                test_literal_expression(
+                    Some(Box::new(exp.arguments[0].clone())),
+                    Expected::IntegerLiteral(1),
+                );
+
+                test_infix_expression(
+                    Some(Box::new(exp.arguments[1].clone())),
+                    Expected::IntegerLiteral(2),
+                    "*".to_string(),
+                    Expected::IntegerLiteral(3),
+                );
+
+                test_infix_expression(
+                    Some(Box::new(exp.arguments[2].clone())),
+                    Expected::IntegerLiteral(4),
+                    "+".to_string(),
+                    Expected::IntegerLiteral(5),
+                );
+            }
+            _ => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                stmt.string()
+            ),
         }
     }
 }

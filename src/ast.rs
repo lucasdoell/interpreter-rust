@@ -23,6 +23,7 @@ pub enum Expression {
     IfExpression(IfExpression),
     BlockStatement(BlockStatement),
     FunctionLiteral(FunctionLiteral),
+    CallExpression(CallExpression),
     // Other types of expressions...
 }
 
@@ -37,6 +38,7 @@ impl Node for Expression {
             Expression::IfExpression(expr) => expr.token_literal(),
             Expression::BlockStatement(stmt) => stmt.token_literal(),
             Expression::FunctionLiteral(func) => func.token_literal(),
+            Expression::CallExpression(expr) => expr.token_literal(),
             // Handle other cases as needed
             _ => unimplemented!(),
         }
@@ -52,6 +54,7 @@ impl Node for Expression {
             Expression::IfExpression(expr) => expr.string(),
             Expression::BlockStatement(stmt) => stmt.string(),
             Expression::FunctionLiteral(func) => func.string(),
+            Expression::CallExpression(expr) => expr.string(),
             // Handle other cases as needed
             _ => unimplemented!(),
         }
@@ -355,6 +358,32 @@ impl Node for FunctionLiteral {
         out.push_str(&params.join(", "));
         out.push_str(") ");
         out.push_str(&self.body.string());
+
+        out
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct CallExpression {
+    pub token: token::Token, // The '(' token
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+
+impl Node for CallExpression {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn string(&self) -> String {
+        let mut out = String::new();
+
+        let args: Vec<String> = self.arguments.iter().map(|a| a.string()).collect();
+
+        out.push_str(&self.function.string());
+        out.push('(');
+        out.push_str(&args.join(", "));
+        out.push(')');
 
         out
     }
