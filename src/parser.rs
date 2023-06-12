@@ -150,7 +150,11 @@ impl Parser {
             return None;
         }
 
-        while !p.cur_token_is(token::SEMICOLON) {
+        p.next_token();
+
+        stmt.value = Parser::parse_expression(p, Precedence::Lowest as i32).unwrap();
+
+        if p.peek_token_is(token::SEMICOLON) {
             p.next_token();
         }
 
@@ -176,7 +180,7 @@ impl Parser {
     }
 
     fn parse_return_statement(p: &mut Parser) -> Option<ast::Statement> {
-        let stmt = ast::ReturnStatement {
+        let mut stmt = ast::ReturnStatement {
             token: p.cur_token.clone(),
             return_value: ast::Expression::Identifier(ast::Identifier {
                 token: p.cur_token.clone(),
@@ -186,7 +190,9 @@ impl Parser {
 
         p.next_token();
 
-        while !p.cur_token_is(token::SEMICOLON) {
+        stmt.return_value = Parser::parse_expression(p, Precedence::Lowest as i32).unwrap();
+
+        if p.peek_token_is(token::SEMICOLON) {
             p.next_token();
         }
 
@@ -511,33 +517,70 @@ mod tests {
 
     #[test]
     fn test_let_statements() {
-        let input = "
-        let x = 5;
-        let y = 10;
-        let foobar = 838383;
-        ";
-        let l = lexer::Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
+        let tests = vec![
+            ("let x = 5;", "x", Expected::IntegerLiteral(5)),
+            ("let y = true;", "y", Expected::Boolean(true)),
+            (
+                "let foobar = y;",
+                "foobar",
+                Expected::Identifier("y".to_string()),
+            ),
+        ];
 
-        let program = Parser::parse_program(&mut p);
-        check_parser_errors(&p);
+        for (input, expected_identifier, expected_value) in tests {
+            let l = lexer::Lexer::new(input.to_string());
+            let mut p = Parser::new(l);
+            let program = Parser::parse_program(&mut p);
+            check_parser_errors(&p);
 
-        if program.is_none() {
-            panic!("ParseProgram() returned None");
-        }
+            if program.is_none() {
+                panic!("ParseProgram() returned None");
+            }
 
-        if program.as_ref().unwrap().statements.len() != 3 {
-            panic!(
-                "program.statements does not contain 3 statements. got={}",
-                program.unwrap().statements.len()
-            );
-        }
+            if program.as_ref().unwrap().statements.len() != 1 {
+                panic!(
+                    "program.statements does not contain 1 statements. got={}",
+                    program.unwrap().statements.len()
+                );
+            }
 
-        let tests = vec!["x", "y", "foobar"];
+            let stmt: Statement = program.as_ref().unwrap().statements[0].clone();
+            if !test_let_statement(stmt.clone(), expected_identifier) {
+                return;
+            }
 
-        for (i, tt) in tests.iter().enumerate() {
-            let stmt: Statement = program.as_ref().unwrap().statements[i].clone();
-            test_let_statement(stmt, tt);
+            let val = match expected_value {
+                Expected::Identifier(s) => {
+                    let exp = match stmt {
+                        Statement::LetStatement(stmt) => stmt.value,
+                        _ => panic!("stmt is not LetStatement"),
+                    };
+
+                    if !test_identifier(Some(Box::new(exp)), s) {
+                        return;
+                    }
+                }
+                Expected::IntegerLiteral(i) => {
+                    let exp = match stmt {
+                        Statement::LetStatement(stmt) => stmt.value,
+                        _ => panic!("stmt is not LetStatement"),
+                    };
+
+                    if !test_integer_literal(Some(Box::new(exp)), i) {
+                        return;
+                    }
+                }
+                Expected::Boolean(b) => {
+                    let exp = match stmt {
+                        Statement::LetStatement(stmt) => stmt.value,
+                        _ => panic!("stmt is not LetStatement"),
+                    };
+
+                    if !test_boolean_literal(Some(Box::new(exp)), b) {
+                        return;
+                    }
+                }
+            };
         }
     }
 
@@ -581,39 +624,82 @@ mod tests {
 
     #[test]
     fn test_return_statements() {
-        let input = "
-        return 5;
-        return 10;
-        return 993322;
-        ";
-        let l = lexer::Lexer::new(input.to_string());
-        let mut p = Parser::new(l);
-
-        let program = Parser::parse_program(&mut p);
-        check_parser_errors(&p);
-
-        if program.is_none() {
-            panic!("ParseProgram() returned None");
+        enum ExpectedType {
+            Identifier(String),
+            IntegerLiteral(i64),
+            Boolean(bool),
         }
 
-        if program.as_ref().unwrap().statements.len() != 3 {
-            panic!(
-                "program.statements does not contain 3 statements. got={}",
-                program.unwrap().statements.len()
-            );
-        }
+        let tests: Vec<(&str, ExpectedType)> = vec![
+            ("return 5;", ExpectedType::IntegerLiteral(5)),
+            ("return true;", ExpectedType::Boolean(true)),
+            (
+                "return foobar;",
+                ExpectedType::Identifier("foobar".to_string()),
+            ),
+        ];
 
-        for stmt in program.unwrap().statements {
+        for (input, expected_value) in tests {
+            let l = lexer::Lexer::new(input.to_string());
+            let mut p = Parser::new(l);
+            let program = Parser::parse_program(&mut p);
+            check_parser_errors(&p);
+
+            if program.is_none() {
+                panic!("ParseProgram() returned None");
+            }
+
+            if program.as_ref().unwrap().statements.len() != 1 {
+                panic!(
+                    "program.statements does not contain 1 statements. got={}",
+                    program.unwrap().statements.len()
+                );
+            }
+
+            let stmt: Statement = program.as_ref().unwrap().statements[0].clone();
             match stmt {
-                Statement::ReturnStatement(return_stmt) => {
+                Statement::ReturnStatement(ref return_stmt) => {
                     if return_stmt.token_literal() != "return" {
                         panic!(
-                            "return_stmt.token_literal not 'return'. got={}",
+                            "returnStmt.token_literal not 'return', got {}",
                             return_stmt.token_literal()
                         );
                     }
+
+                    match expected_value {
+                        ExpectedType::Identifier(s) => {
+                            let exp = match stmt {
+                                Statement::ReturnStatement(stmt) => stmt.return_value,
+                                _ => panic!("stmt is not ReturnStatement"),
+                            };
+
+                            if !test_identifier(Some(Box::new(exp)), s) {
+                                return;
+                            }
+                        }
+                        ExpectedType::IntegerLiteral(i) => {
+                            let exp = match stmt {
+                                Statement::ReturnStatement(stmt) => stmt.return_value,
+                                _ => panic!("stmt is not ReturnStatement"),
+                            };
+
+                            if !test_integer_literal(Some(Box::new(exp)), i) {
+                                return;
+                            }
+                        }
+                        ExpectedType::Boolean(b) => {
+                            let exp = match stmt {
+                                Statement::ReturnStatement(stmt) => stmt.return_value,
+                                _ => panic!("stmt is not LetStatement"),
+                            };
+
+                            if !test_boolean_literal(Some(Box::new(exp)), b) {
+                                return;
+                            }
+                        }
+                    };
                 }
-                _ => panic!("stmt not ReturnStatement. got={:?}", stmt.token_literal()),
+                _ => panic!("stmt is not ReturnStatement"),
             }
         }
     }
