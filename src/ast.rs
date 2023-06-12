@@ -39,8 +39,6 @@ impl Node for Expression {
             Expression::BlockStatement(stmt) => stmt.token_literal(),
             Expression::FunctionLiteral(func) => func.token_literal(),
             Expression::CallExpression(expr) => expr.token_literal(),
-            // Handle other cases as needed
-            _ => unimplemented!(),
         }
     }
 
@@ -55,8 +53,6 @@ impl Node for Expression {
             Expression::BlockStatement(stmt) => stmt.string(),
             Expression::FunctionLiteral(func) => func.string(),
             Expression::CallExpression(expr) => expr.string(),
-            // Handle other cases as needed
-            _ => unimplemented!(),
         }
     }
 }
