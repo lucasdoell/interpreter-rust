@@ -5,7 +5,7 @@ use crate::lexer;
 use crate::token;
 
 #[derive(Clone)]
-struct Parser {
+pub struct Parser {
     l: lexer::Lexer,
     cur_token: token::Token,
     peek_token: token::Token,
@@ -43,7 +43,7 @@ pub fn get_precedences() -> HashMap<String, i32> {
 }
 
 impl Parser {
-    fn new(l: lexer::Lexer) -> Self {
+    pub fn new(l: lexer::Lexer) -> Self {
         let mut p = Parser {
             l,
             cur_token: token::Token {
@@ -84,8 +84,12 @@ impl Parser {
         p
     }
 
-    fn errors(&self) -> Vec<String> {
+    pub fn errors(&self) -> Vec<String> {
         self.errors.clone()
+    }
+
+    pub fn clear_errors(&mut self) {
+        self.errors.clear();
     }
 
     fn peek_error(&mut self, t: String) {
@@ -101,7 +105,7 @@ impl Parser {
         self.peek_token = self.l.next_token();
     }
 
-    fn parse_program(p: &mut Parser) -> Option<ast::Program> {
+    pub fn parse_program(p: &mut Parser) -> Option<ast::Program> {
         let mut program = ast::Program {
             statements: Vec::new(),
         };
@@ -549,7 +553,7 @@ mod tests {
                 return;
             }
 
-            let val = match expected_value {
+            match expected_value {
                 Expected::Identifier(s) => {
                     let exp = match stmt {
                         Statement::LetStatement(stmt) => stmt.value,
@@ -1317,6 +1321,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn test_function_parameter_parsing() {
         let tests = vec![
             ("fn() {};", vec![]),
