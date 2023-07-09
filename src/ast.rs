@@ -122,10 +122,7 @@ impl Node for LetStatement {
         out.push_str(" ");
         out.push_str(&self.name.string());
         out.push_str(" = ");
-
-        if let Expression::Identifier(_) = self.value {
-            out.push_str(&self.value.string());
-        }
+        out.push_str(&self.value.string());
 
         out.push_str(";");
 
